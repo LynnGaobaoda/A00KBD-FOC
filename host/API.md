@@ -111,3 +111,7 @@ Import `configs/foc_flash.json`. GUI button **刷FOC APP**, or CLI `flash COM3 f
 ## GUI
 
 Connect hardware COM, live RX pane (also shows CLI TX), send box, Import JSON, buttons from every imported pack. Status line shows `open COMx | com 127.0.0.1:17890`.
+
+## iPhone WAN (Cloudflare + SMTP)
+
+`start_phone_tap.bat` runs `setup_phone.py --serve --wan`: localhost HTTP on `127.0.0.1:17891` (`phone_tap.py` + `ios/foc_phone.html`), a `cloudflared` quick tunnel, then `smtp_wan.py` emails `https://<trycloudflare>/?token=...`. Copy `smtp.json.example` to `.smtp.json`. Taps call `mcu_host.py` CLI (`preset` / `send`); GUI is optional. If the GUI already owns COM, CLI uses `127.0.0.1:17890`; otherwise `--direct` opens the serial port.

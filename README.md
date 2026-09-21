@@ -50,6 +50,18 @@ python mcu_host.py flash COM3 foc-flash
 
 导入 `host/configs/foc_flash.json` 后，GUI 可 **刷FOC APP**（镜像默认 `out/motor.bin`）。APP 侧发 `iap` 会写入 BKP 魔术字并复位进 boot。完整协议见 [host/API.md](host/API.md)。
 
+## iPhone 外网控制
+
+Safari 打开邮件里的链接即可点格子控制电机，不必开上位机 GUI。本机只需 USB 串口空闲，并运行：
+
+```text
+cd host
+复制 smtp.json.example 为 .smtp.json，填入 QQ 邮箱和 SMTP 授权码
+安装 cloudflared 后执行 start_phone_tap.bat
+```
+
+脚本会在 `127.0.0.1:17891` 起网页服务，用 Cloudflare 临时隧道暴露外网，并把带 `?token=` 的地址发到 `.smtp.json` 里的邮箱。口令、SMTP 授权码、当前隧道地址写在 gitignore 的本地文件里，不要提交。隧道域名每次重启都会变，会再发一封邮件。
+
 ## 硬件约定
 
 - MCU：STM32F103（72 MHz）
