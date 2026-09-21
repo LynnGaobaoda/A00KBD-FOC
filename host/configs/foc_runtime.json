@@ -1,0 +1,13 @@
+{
+  "id": "foc-runtime",
+  "name": "MCU运行数据",
+  "baud": 115200,
+  "eol": "crlf",
+  "commands": [
+    {"id": "stat", "label": "stat", "tx": "stat"},
+    {"id": "hbon", "label": "心跳开", "tx": "hb on"},
+    {"id": "hboff", "label": "心跳关", "tx": "hb off"},
+    {"id": "dbgon", "label": "dbg开", "tx": "dbg on"},
+    {"id": "dbgoff", "label": "dbg关", "tx": "dbg off"}
+  ]
+}

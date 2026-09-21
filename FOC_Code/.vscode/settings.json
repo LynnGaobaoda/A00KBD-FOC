@@ -1,0 +1,32 @@
+{
+    "MicroPython.executeButton": [
+        {
+            "text": "▶",
+            "tooltip": "Run",
+            "alignment": "left",
+            "command": "extension.executeFile",
+            "priority": 3.5
+        }
+    ],
+    "MicroPython.syncButton": [
+        {
+            "text": "$(sync)",
+            "tooltip": "sync",
+            "alignment": "left",
+            "command": "extension.execute",
+            "priority": 4
+        }
+    ],
+    "files.associations": {
+        "focctrl.h": "c",
+        "rtwtypes.h": "c",
+        "asr_s32.h": "c",
+        "std_types.h": "c",
+        "platform_types.h": "c",
+        "stm32f10x_it.h": "c",
+        "myproject.h": "c",
+        "cmath": "c",
+        "rte_focctrl.h": "c",
+        "lowpass_filter.h": "c"
+    }
+}

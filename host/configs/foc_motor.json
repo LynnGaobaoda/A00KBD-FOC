@@ -1,0 +1,12 @@
+{
+  "id": "foc-motor",
+  "name": "电机控制",
+  "baud": 115200,
+  "eol": "crlf",
+  "commands": [
+    {"id": "help", "label": "帮助", "tx": "help"},
+    {"id": "r", "label": "棘轮", "tx": "r"},
+    {"id": "cw", "label": "顺时针60°", "tx": "cw"},
+    {"id": "ccw", "label": "逆时针60°", "tx": "ccw"}
+  ]
+}

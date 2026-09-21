@@ -1,0 +1,18 @@
+{
+  "id": "foc-tune",
+  "name": "调参",
+  "baud": 115200,
+  "eol": "crlf",
+  "commands": [
+    {"id": "p", "label": "读参数", "tx": "p"},
+    {"id": "n12", "label": "12挡", "tx": "set n 12"},
+    {"id": "n6", "label": "6挡", "tx": "set n 6"},
+    {"id": "soft", "label": "手感软", "tx": "set kp 3200"},
+    {"id": "uq1100", "label": "Uq=1100", "tx": "set uq 1100"},
+    {"id": "mid", "label": "手感中", "tx": "set kp 4500"},
+    {"id": "hard", "label": "手感硬", "tx": "set kp 6000"},
+    {"id": "slow", "label": "旋转慢", "tx": "set spd 1"},
+    {"id": "midspd", "label": "旋转中", "tx": "set spd 2"},
+    {"id": "fast", "label": "旋转快", "tx": "set spd 6"}
+  ]
+}

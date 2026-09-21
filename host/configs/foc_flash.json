@@ -1,0 +1,19 @@
+{
+  "id": "foc-flash",
+  "name": "串口刷新",
+  "type": "flash",
+  "baud": 115200,
+  "eol": "crlf",
+  "app_base": "0x08002000",
+  "image": "../../out/motor.bin",
+  "enter_tx": "iap",
+  "enter_wait_s": 0.5,
+  "chunk": 128,
+  "commands": [
+    {"id": "ver", "label": "版本", "tx": "ver"},
+    {"id": "ver-boot", "label": "Boot版本", "tx": "ver boot"},
+    {"id": "ver-app", "label": "APP版本", "tx": "ver app"},
+    {"id": "enter", "label": "进Boot", "tx": "iap"},
+    {"id": "app", "label": "刷FOC APP", "flash": "image"}
+  ]
+}

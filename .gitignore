@@ -1,0 +1,31 @@
+# Keil / µVision
+**/Objects/
+**/Listings/
+**/DebugConfig/
+*.o
+*.d
+*.crf
+*.uvguix.*
+*.bak
+JLinkLog.txt
+EventRecorderStub.scvd
+*.build_log.htm
+*.dep
+
+# Host (Python)
+__pycache__/
+*.pyc
+host/build/
+host/dist/
+host/state.json
+host/*.spec
+host/gui_err.txt
+host/gui_out.txt
+
+# Local / generated
+.codegraph/
+.cursor/
+*.tmp
+*.log
+.DS_Store
+Thumbs.db

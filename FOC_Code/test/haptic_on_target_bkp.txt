@@ -1,0 +1,5 @@
+on-target closed-loop (snap 65% + lock 40)
+hold vs crawl 2000 + lock: dpos=155 snap=0 index=0 err~152 uq~-816 stable (no chatter; bias cannot walk out of well)
+
+openloop+lock: dpos=1289 (~74deg) snap=1 index=-1 no chatter; packed uq holds -1504 in well
+
