@@ -24,14 +24,15 @@
 #define ALIGN_MIN_MOVE  80            /* ~4.6 deg; encoder must move */
 
 #define FOC_MODE_RATCHET  0u
-#define FOC_MODE_GOTO     1u
+#define FOC_MODE_POS      1u          /* hold angle */
+#define FOC_MODE_SPD      2u          /* constant speed */
+#define FOC_MODE_FORCE    3u          /* constant Uq (voltage torque) */
 #define DEG_CMD(x)        ((sint32)(x) * FOC_2PI / 360)
 #define GOTO_KP_DEF       2500
 #define GOTO_UQ_DEF       1400
 #define GOTO_SPD_DEF      1           /* millirad / ms; 60° ≈ 1.0 s */
-#define GOTO_SETTLE       DEG_CMD(4)
-#define GOTO_HOLD_MS      80u
-#define GOTO_TIMEOUT_MS   8000u
+#define VEL_MAX           40
+#define FORCE_MAX         4000
 
 
 typedef struct
@@ -48,12 +49,12 @@ typedef struct
     sint32 goto_spd;
     uint32 goto_t0;
     uint16 duty[3];
-    uint16 hold_ms;
+    sint32 vel_cmd;
+    sint32 force_cmd;
     uint8  aligned;
-    uint8  mode;     /* 0=ratchet, 1=goto */
+    uint8  mode;     /* 0=ratchet 1=pos 2=spd 3=force */
     uint8  dbg;
     uint8  hb;
-    uint8  goto_near;
 } FocHand_t;
 
 static FocHand_t g_foc;
@@ -188,11 +189,12 @@ void Swc_Foc_Init(void)
     g_foc.mode = FOC_MODE_RATCHET;
     g_foc.dbg = 0u;
     g_foc.hb = 1u;
-    g_foc.hold_ms = 0;
     g_foc.goto_kp = GOTO_KP_DEF;
     g_foc.goto_uq = GOTO_UQ_DEF;
     g_foc.goto_spd = GOTO_SPD_DEF;
     g_foc.tgt_cmd = 0;
+    g_foc.vel_cmd = GOTO_SPD_DEF;
+    g_foc.force_cmd = 1100;
     HapticRatchet_Apply(12u, 3200, 1100, 2);
 }
 
@@ -267,7 +269,7 @@ void Swc_Foc_Align(void)
     g_foc.mode = FOC_MODE_RATCHET;
     g_foc.dbg = 0u;
     printf("FOC align ok dir=%d zero=%d\r\n", (int)dir, (int)zero);
-    printf("uart 115200. help | r | cw | ccw | p | set ...\r\n");
+    printf("uart 115200. help | r | spd | force | pos | cw | ccw | p | set ...\r\n");
 }
 
 void Swc_Foc_1ms(void)
@@ -275,12 +277,27 @@ void Swc_Foc_1ms(void)
     Swc_Foc_Loop();
 }
 
-/* Main-loop FOC: encoder -> mode (ratchet or goto) -> inverse Park + SVPWM. */
-void Swc_Foc_Loop(void)
+static sint32 Foc_PosUq(void)
 {
     sint32 err;
     sint32 uq;
 
+    err = g_foc.pos - g_foc.tgt_cmd;
+    uq = -g_foc.goto_kp * err / 1000;
+    if (uq > g_foc.goto_uq)
+    {
+        uq = g_foc.goto_uq;
+    }
+    if (uq < -g_foc.goto_uq)
+    {
+        uq = -g_foc.goto_uq;
+    }
+    return uq;
+}
+
+/* Main-loop FOC: encoder -> mode -> inverse Park + SVPWM. */
+void Swc_Foc_Loop(void)
+{
     if (!g_foc.aligned)
     {
         return;
@@ -289,27 +306,13 @@ void Swc_Foc_Loop(void)
     Rte_Call_CS_MachRad_Operation(&g_foc.pos);
     Rte_Call_CS_ElecRad_Operation(&g_foc.elec_ang);
 
-    if (g_foc.mode == FOC_MODE_GOTO)
+    if (g_foc.mode == FOC_MODE_FORCE)
     {
-        err = g_foc.pos - g_foc.tgt_cmd;
-        uq = -g_foc.goto_kp * err / 1000;
-        if (uq > g_foc.goto_uq)
-        {
-            uq = g_foc.goto_uq;
-        }
-        if (uq < -g_foc.goto_uq)
-        {
-            uq = -g_foc.goto_uq;
-        }
-        g_foc.uq = uq;
-        if ((err <= GOTO_SETTLE) && (err >= -GOTO_SETTLE))
-        {
-            g_foc.goto_near = 1u;
-        }
-        else
-        {
-            g_foc.goto_near = 0u;
-        }
+        g_foc.uq = g_foc.force_cmd;
+    }
+    else if ((g_foc.mode == FOC_MODE_POS) || (g_foc.mode == FOC_MODE_SPD))
+    {
+        g_foc.uq = Foc_PosUq();
     }
     else
     {
@@ -353,31 +356,128 @@ static void Foc_EnterRatchet(void)
     printf("mode=ratchet\r\n");
 }
 
-static void Foc_GotoDelta(sint32 dpos)
+static const char *Foc_ModeName(void)
 {
-    if (!g_foc.aligned)
+    switch (g_foc.mode)
     {
-        printf("err not aligned\r\n");
+        case FOC_MODE_POS:   return "pos";
+        case FOC_MODE_SPD:   return "spd";
+        case FOC_MODE_FORCE: return "force";
+        default:             return "ratchet";
+    }
+}
+
+static uint8 Foc_NeedAlign(void)
+{
+    if (g_foc.aligned)
+    {
+        return 1u;
+    }
+    printf("err not aligned\r\n");
+    return 0u;
+}
+
+static sint32 Foc_Clamp(sint32 v, sint32 lo, sint32 hi)
+{
+    if (v < lo)
+    {
+        return lo;
+    }
+    if (v > hi)
+    {
+        return hi;
+    }
+    return v;
+}
+
+static void Foc_EnterPos(sint32 tgt)
+{
+    if (!Foc_NeedAlign())
+    {
         return;
     }
     g_foc.tgt_cmd = g_foc.pos;
-    g_foc.tgt = g_foc.pos + dpos;
-    g_foc.goto_t0 = time1_cntr;
-    g_foc.hold_ms = 0;
-    g_foc.goto_near = 0u;
-    g_foc.mode = FOC_MODE_GOTO;
-    printf("goto %s60 tgt=%d\r\n", (dpos >= 0) ? "+" : "-", (int)g_foc.tgt);
+    g_foc.tgt = tgt;
+    g_foc.mode = FOC_MODE_POS;
+    printf("mode=pos tgt=%d\r\n", (int)g_foc.tgt);
+}
+
+static void Foc_EnterSpd(sint32 vel)
+{
+    if (!Foc_NeedAlign())
+    {
+        return;
+    }
+    g_foc.vel_cmd = Foc_Clamp(vel, -VEL_MAX, VEL_MAX);
+    g_foc.tgt_cmd = g_foc.pos;
+    g_foc.tgt = g_foc.pos;
+    g_foc.mode = FOC_MODE_SPD;
+    printf("mode=spd vel=%d\r\n", (int)g_foc.vel_cmd);
+}
+
+static void Foc_EnterForce(sint32 uq)
+{
+    if (!Foc_NeedAlign())
+    {
+        return;
+    }
+    g_foc.force_cmd = Foc_Clamp(uq, -FORCE_MAX, FORCE_MAX);
+    g_foc.mode = FOC_MODE_FORCE;
+    printf("mode=force uq=%d\r\n", (int)g_foc.force_cmd);
+}
+
+static void Foc_ApplyDir(sint32 sign)
+{
+    sint32 a;
+
+    if (sign == 0)
+    {
+        printf("dir cw|ccw\r\n");
+        return;
+    }
+    if (g_foc.mode == FOC_MODE_SPD)
+    {
+        a = g_foc.vel_cmd;
+        if (a < 0)
+        {
+            a = -a;
+        }
+        if (a < 1)
+        {
+            a = g_foc.goto_spd;
+        }
+        Foc_EnterSpd(sign * a);
+    }
+    else if (g_foc.mode == FOC_MODE_FORCE)
+    {
+        a = g_foc.force_cmd;
+        if (a < 0)
+        {
+            a = -a;
+        }
+        if (a < 200)
+        {
+            a = 1100;
+        }
+        Foc_EnterForce(sign * a);
+    }
+    else
+    {
+        Foc_EnterSpd(sign * ((g_foc.goto_spd > 0) ? g_foc.goto_spd : 1));
+    }
 }
 
 static void Foc_PrintStat(void)
 {
-    printf("st %d %d %d %d %d %d\r\n",
-           (int)g_foc.mode,
+    printf("st %s %d %d %d %d %d vel=%d f=%d\r\n",
+           Foc_ModeName(),
            (int)g_foc.pos,
            (int)g_foc.uq,
            (int)HapticRatchet_GetIndex(),
            (int)g_foc.tgt,
-           (int)g_foc.aligned);
+           (int)g_foc.aligned,
+           (int)g_foc.vel_cmd,
+           (int)g_foc.force_cmd);
 }
 
 static void SkipSp(char **p)
@@ -415,9 +515,10 @@ static void Foc_PrintParam(void)
     sint32 dead;
 
     HapticRatchet_GetCfg(&n, &kp, &uq, &dead);
-    printf("cal 3205B pp=7 ualign=1800 n=%u kp=%d uq=%d dead=%d gkp=%d guq=%d spd=%d\r\n",
+    printf("cal 3205B pp=7 ualign=1800 n=%u kp=%d uq=%d dead=%d gkp=%d guq=%d spd=%d vel=%d f=%d %s\r\n",
            (unsigned)n, (int)kp, (int)uq, (int)dead,
-           (int)g_foc.goto_kp, (int)g_foc.goto_uq, (int)g_foc.goto_spd);
+           (int)g_foc.goto_kp, (int)g_foc.goto_uq, (int)g_foc.goto_spd,
+           (int)g_foc.vel_cmd, (int)g_foc.force_cmd, Foc_ModeName());
 }
 
 static uint8 Foc_HandleSet(char *line)
@@ -496,30 +597,116 @@ static uint8 Foc_HandleSet(char *line)
     else
     {
         printf("set kp|uq|n|dead|gkp|guq|spd N\r\n");
+        printf("spd N | force N | pos [+/-]deg | dir cw|ccw | r\r\n");
         return 1u;
     }
     Foc_PrintParam();
     return 1u;
 }
 
+static void SkipTok(char **p)
+{
+    while (**p && (**p != ' ') && (**p != '\t'))
+    {
+        (*p)++;
+    }
+    SkipSp(p);
+}
+
 static void Foc_HandleLine(char *line)
 {
+    char *p;
+
     if (CmdIs(line, "help") || CmdIs(line, "?"))
     {
-        printf("r ratchet  cw +60  ccw -60  p  set kp|uq|n|dead|gkp|guq|spd N\r\n");
+        printf("r ratchet  spd N  force N  pos [+|-]deg  dir cw|ccw  stop\r\n");
+        printf("cw +60  ccw -60  p  set kp|uq|n|dead|gkp|guq|spd N\r\n");
         printf("stat  dbg on|off  hb on|off  iap  ver|ver boot|ver app\r\n");
     }
     else if (CmdIs(line, "r") || CmdIs(line, "ratchet"))
     {
         Foc_EnterRatchet();
     }
+    else if (CmdIs(line, "spd") || CmdIs(line, "speed"))
+    {
+        p = line;
+        SkipTok(&p);
+        if (*p == 0)
+        {
+            Foc_EnterSpd(g_foc.vel_cmd);
+        }
+        else
+        {
+            Foc_EnterSpd(ParseInt(&p));
+        }
+    }
+    else if (CmdIs(line, "force") || CmdIs(line, "trq"))
+    {
+        p = line;
+        SkipTok(&p);
+        if (*p == 0)
+        {
+            Foc_EnterForce(g_foc.force_cmd);
+        }
+        else
+        {
+            Foc_EnterForce(ParseInt(&p));
+        }
+    }
+    else if (CmdIs(line, "pos"))
+    {
+        sint32 deg;
+        uint8 rel = 0u;
+
+        p = line;
+        SkipTok(&p);
+        if (*p == 0)
+        {
+            Foc_EnterPos(g_foc.pos);
+        }
+        else
+        {
+            if (*p == '+')
+            {
+                rel = 1u;
+                p++;
+            }
+            else if (*p == '-')
+            {
+                rel = 1u;
+            }
+            deg = ParseInt(&p);
+            Foc_EnterPos(rel ? (g_foc.pos + DEG_CMD(deg)) : DEG_CMD(deg));
+        }
+    }
+    else if (CmdIs(line, "dir"))
+    {
+        p = line;
+        SkipTok(&p);
+        if (CmdIs(p, "cw") || CmdIs(p, "+"))
+        {
+            Foc_ApplyDir(1);
+        }
+        else if (CmdIs(p, "ccw") || CmdIs(p, "-"))
+        {
+            Foc_ApplyDir(-1);
+        }
+        else
+        {
+            Foc_ApplyDir(0);
+        }
+    }
+    else if (CmdIs(line, "stop"))
+    {
+        Foc_EnterPos(g_foc.pos);
+    }
     else if (CmdIs(line, "cw") || CmdIs(line, "cw60"))
     {
-        Foc_GotoDelta(DEG_CMD(60));
+        Foc_EnterPos(g_foc.pos + DEG_CMD(60));
     }
     else if (CmdIs(line, "ccw") || CmdIs(line, "ccw60"))
     {
-        Foc_GotoDelta(-DEG_CMD(60));
+        Foc_EnterPos(g_foc.pos - DEG_CMD(60));
     }
     else if (CmdIs(line, "stat"))
     {
@@ -601,7 +788,6 @@ void Swc_Foc_PollUart(void)
     static uint32 last_ms;
     static uint32 hb_t;
     static uint8 dbg_div;
-    uint32 dt;
 
     if ((USART_RX_STA & 0x8000) != 0)
     {
@@ -615,45 +801,33 @@ void Swc_Foc_PollUart(void)
     }
     last_ms = time1_cntr;
 
-    if (g_foc.mode == FOC_MODE_GOTO)
+    if (g_foc.mode == FOC_MODE_SPD)
     {
-        {
-            sint32 d;
-            sint32 step;
+        g_foc.tgt_cmd += g_foc.vel_cmd;
+        g_foc.tgt = g_foc.tgt_cmd;
+    }
+    else if (g_foc.mode == FOC_MODE_POS)
+    {
+        sint32 d;
+        sint32 step;
 
-            d = g_foc.tgt - g_foc.tgt_cmd;
-            step = g_foc.goto_spd;
-            if (step < 1)
-            {
-                step = 1;
-            }
-            if (d > step)
-            {
-                g_foc.tgt_cmd += step;
-            }
-            else if (d < -step)
-            {
-                g_foc.tgt_cmd -= step;
-            }
-            else
-            {
-                g_foc.tgt_cmd = g_foc.tgt;
-            }
-        }
-        dt = time1_cntr - g_foc.goto_t0;
-        if ((g_foc.goto_near != 0u) && (g_foc.tgt_cmd == g_foc.tgt))
+        d = g_foc.tgt - g_foc.tgt_cmd;
+        step = g_foc.goto_spd;
+        if (step < 1)
         {
-            g_foc.hold_ms++;
+            step = 1;
+        }
+        if (d > step)
+        {
+            g_foc.tgt_cmd += step;
+        }
+        else if (d < -step)
+        {
+            g_foc.tgt_cmd -= step;
         }
         else
         {
-            g_foc.hold_ms = 0;
-        }
-        if ((g_foc.hold_ms >= GOTO_HOLD_MS) || (dt >= GOTO_TIMEOUT_MS))
-        {
-            HapticRatchet_Init(g_foc.pos);
-            g_foc.mode = FOC_MODE_RATCHET;
-            printf("ok ratchet pos=%d\r\n", (int)g_foc.pos);
+            g_foc.tgt_cmd = g_foc.tgt;
         }
     }
 

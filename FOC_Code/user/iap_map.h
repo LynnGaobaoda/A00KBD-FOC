@@ -25,6 +25,6 @@
 
 #define IAP_BOOT_VER_ADDR 0x08001FC0u
 #define IAP_BOOT_VER_STR  "Boot_01.000_20260921"
-#define IAP_APP_VER_STR   "App_01.000_20260921"
+#define IAP_APP_VER_STR   "App_01.001_20260921"
 
 #endif

@@ -6,7 +6,16 @@
   "commands": [
     {"id": "help", "label": "帮助", "tx": "help"},
     {"id": "r", "label": "棘轮", "tx": "r"},
+    {"id": "spd3", "label": "恒速+3", "tx": "spd 3"},
+    {"id": "spd-3", "label": "恒速-3", "tx": "spd -3"},
+    {"id": "force1100", "label": "恒力+1100", "tx": "force 1100"},
+    {"id": "force-1100", "label": "恒力-1100", "tx": "force -1100"},
+    {"id": "pos0", "label": "位置保持", "tx": "pos"},
+    {"id": "pos90", "label": "位置90°", "tx": "pos 90"},
     {"id": "cw", "label": "顺时针60°", "tx": "cw"},
-    {"id": "ccw", "label": "逆时针60°", "tx": "ccw"}
+    {"id": "ccw", "label": "逆时针60°", "tx": "ccw"},
+    {"id": "dircw", "label": "方向CW", "tx": "dir cw"},
+    {"id": "dirccw", "label": "方向CCW", "tx": "dir ccw"},
+    {"id": "stop", "label": "停止保持", "tx": "stop"}
   ]
 }
