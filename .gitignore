@@ -18,6 +18,11 @@ __pycache__/
 host/build/
 host/dist/
 host/state.json
+host/.tap_token
+host/.smtp.json
+host/.wan_url
+host/.wan_cloudflared.log
+host/ios/FOC-motor.local.shortcut
 host/*.spec
 host/gui_err.txt
 host/gui_out.txt

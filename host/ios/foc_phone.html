@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FOC电机">
+<meta name="theme-color" content="#07080d">
+<title>FOC 电机</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100dvh;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
+    color: #f4f6fb;
+    background:
+      radial-gradient(1200px 600px at 10% -10%, #1b3a5a 0%, transparent 55%),
+      radial-gradient(900px 500px at 110% 0%, #3a1d4a 0%, transparent 50%),
+      #07080d;
+    padding: calc(18px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+  }
+  .top {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 12px; margin-bottom: 18px;
+  }
+  h1 { font-size: 26px; letter-spacing: .02em; margin: 0 0 4px; font-weight: 720; }
+  .sub { margin: 0; color: #9aa6b8; font-size: 13px; }
+  .chip {
+    flex: none; font-size: 12px; color: #b8f0d0; background: #143226;
+    border: 1px solid #2b6b4e; border-radius: 999px; padding: 6px 10px;
+  }
+  .sec { margin: 18px 0 8px; color: #8b97ab; font-size: 12px; letter-spacing: .14em; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .tile {
+    appearance: none; border: 0; text-align: left; cursor: pointer;
+    min-height: 92px; border-radius: 18px; padding: 14px 14px 12px;
+    color: #fff; box-shadow: 0 10px 24px rgba(0,0,0,.22);
+  }
+  .tile:active { transform: scale(.98); }
+  .tile:disabled { opacity: .55; }
+  .kicker { font-size: 11px; opacity: .78; margin-bottom: 6px; }
+  .title { font-size: 18px; font-weight: 700; line-height: 1.2; }
+  .hint { font-size: 12px; opacity: .72; margin-top: 6px; }
+  .c-move { background: linear-gradient(160deg, #2f6dff, #1a3fbf); }
+  .c-spd  { background: linear-gradient(160deg, #12b3a8, #0a6e78); }
+  .c-force{ background: linear-gradient(160deg, #f0a202, #c26100); }
+  .c-pos  { background: linear-gradient(160deg, #8b6cff, #4e35c9); }
+  .c-sys  { background: linear-gradient(160deg, #3d4658, #232833); }
+  .c-stop { background: linear-gradient(160deg, #ff5d6c, #b31d3a); }
+  .log {
+    margin-top: 16px; background: #10131a; border-radius: 16px;
+    padding: 12px 14px; min-height: 88px; color: #9fecc0;
+    font-size: 12px; white-space: pre-wrap; word-break: break-all;
+    border: 1px solid #1c2430;
+  }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div>
+      <h1>FOC 控制</h1>
+      <p class="sub">点按即执行 · 用邮件链接打开</p>
+    </div>
+    <div class="chip">在线</div>
+  </div>
+
+  <div class="sec">运动</div>
+  <div class="grid">
+    <button class="tile c-move" data-id="cw"><div class="kicker">位置</div><div class="title">顺时针</div><div class="hint">+60°</div></button>
+    <button class="tile c-move" data-id="ccw"><div class="kicker">位置</div><div class="title">逆时针</div><div class="hint">-60°</div></button>
+    <button class="tile c-stop" data-id="stop"><div class="kicker">急停</div><div class="title">停止保持</div><div class="hint">停在当前角</div></button>
+    <button class="tile c-sys" data-id="r"><div class="kicker">手感</div><div class="title">棘轮</div><div class="hint">虚拟挡位</div></button>
+  </div>
+
+  <div class="sec">速度 / 力</div>
+  <div class="grid">
+    <button class="tile c-spd" data-id="spd3"><div class="kicker">恒速</div><div class="title">正转</div><div class="hint">spd +3</div></button>
+    <button class="tile c-spd" data-id="spd-3"><div class="kicker">恒速</div><div class="title">反转</div><div class="hint">spd -3</div></button>
+    <button class="tile c-force" data-id="force1100"><div class="kicker">恒力</div><div class="title">正向力</div><div class="hint">Uq +1100</div></button>
+    <button class="tile c-force" data-id="force-1100"><div class="kicker">恒力</div><div class="title">反向力</div><div class="hint">Uq -1100</div></button>
+    <button class="tile c-spd" data-id="dircw"><div class="kicker">方向</div><div class="title">CW</div><div class="hint">当前模式</div></button>
+    <button class="tile c-spd" data-id="dirccw"><div class="kicker">方向</div><div class="title">CCW</div><div class="hint">当前模式</div></button>
+  </div>
+
+  <div class="sec">位置 / 查询</div>
+  <div class="grid">
+    <button class="tile c-pos" data-id="pos"><div class="kicker">位置</div><div class="title">保持</div><div class="hint">锁当前角</div></button>
+    <button class="tile c-pos" data-id="pos90"><div class="kicker">位置</div><div class="title">90°</div><div class="hint">绝对角</div></button>
+    <button class="tile c-sys" data-id="stat"><div class="kicker">系统</div><div class="title">状态</div><div class="hint">mode / pos</div></button>
+    <button class="tile c-sys" data-id="help"><div class="kicker">系统</div><div class="title">帮助</div><div class="hint">UART 命令</div></button>
+  </div>
+
+  <div class="log" id="out">点任一功能即可下发。</div>
+<script>
+(function () {
+  const out = document.getElementById("out");
+  const q = new URLSearchParams(location.search);
+  const fromUrl = q.get("token") || "";
+  if (fromUrl) {
+    localStorage.setItem("foc_tap_token", fromUrl);
+  }
+  function token() {
+    return (new URLSearchParams(location.search).get("token")
+      || localStorage.getItem("foc_tap_token") || "").trim();
+  }
+  async function run(id, label) {
+    const tok = token();
+    if (!tok) {
+      out.textContent = "请使用邮件里的完整链接打开。";
+      return;
+    }
+    const tiles = document.querySelectorAll(".tile");
+    tiles.forEach(function (b) { b.disabled = true; });
+    out.textContent = "执行 " + label + " …";
+    try {
+      const r = await fetch("/tap/" + encodeURIComponent(id) + "?token=" + encodeURIComponent(tok));
+      out.textContent = await r.text();
+    } catch (e) {
+      out.textContent = String(e);
+    }
+    tiles.forEach(function (b) { b.disabled = false; });
+  }
+  document.querySelectorAll(".tile").forEach(function (b) {
+    b.onclick = function () {
+      run(b.getAttribute("data-id"), b.querySelector(".title").textContent);
+    };
+  });
+})();
+</script>
+</body>
+</html>
